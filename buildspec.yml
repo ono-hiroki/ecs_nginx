@@ -1,0 +1,22 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo "Logging in to Amazon ECR..."
+      - AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - NGINX_REPO=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/nginx
+      - NGINX_IMAGE=$NGINX_REPO:latest
+  build:
+    commands:
+      - echo "Building the Docker image..."
+      - docker build -t $NGINX_IMAGE -f ./docker/nginx/ecs/Dockerfile .
+      - echo "Pushing the Docker image to ECR..."
+      - docker push $NGINX_IMAGE
+  post_build:
+    commands:
+      - echo "Creating imagedefinitions.json..."
+      - printf '[{"name":"nginx","imageUri":"%s"}]' $NGINX_IMAGE > imagedefinitions.json
+artifacts:
+  files: imagedefinitions.json
